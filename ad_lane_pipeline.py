@@ -5,70 +5,7 @@ import pickle
 import glob
 from gui_util import AdjustSobel
 from gui_util import AdjustHLS
-
-# Important constants and paremeters
-cam_values = pickle.load(open('cam_values.p', "rb"))
-
-images = glob.glob(r".\test_images\*.jpg")
-
-def preprocess_image(img, cam_values):
-    """
-    Function to prepare image for lane extraction:
-    1. undistort image
-    2. crop a region of interest
-    3. convert image to hsv
-    4. Get binary gradient image using sobel
-    5. transfer binary image using the roi
-
-    Args:
-        img ([type]): [description]
-    """
-
-    vertices = np.array([[
-        ((image.shape[1]/2 - 80),image.shape[0]/1.6),
-        ((image.shape[1]/2 + 80),image.shape[0]/1.6),
-        ((image.shape[1] - 150  ),image.shape[0] - 55),
-        (0 + 225,image.shape[0] - 55)]], dtype=np.int32)
-
-    offset = vertices[0][0][0] - vertices[0][3][0]
-
-    dst = np.array([[
-        (125, 0),
-        ((image.shape[1] -125),0),
-        ((image.shape[1] - 265),image.shape[0]),
-        (265,image.shape[0])]], dtype=np.int32)
-
-    undist = cv2.undistort(img, cam_values['mtx'], cam_values['dist'], None, cam_values['mtx'])
-
-    bin_image_thresh = abs_sobel_thresh(undist, orient='x', thresh_min = 10, thresh_max = 100)
-    #if disturbance is to high reset to 150-170 (min value)
-    bin_image_hls = svalues_mask(undist, s_min = 120, s_max = 255)
-
-    #combine both bin images
-    bin_image = np.zeros_like(bin_image_thresh)
-    bin_image[(bin_image_thresh == 1) | (bin_image_hls == 1)] = 1
-
-    bin_image_crop = region_of_interest(bin_image, vertices)
-
-    src = np.float32([[vertices[0][0]],[vertices[0][1]], [vertices[0][2]],[vertices[0][3]]])
-
-    bin_image_warped = warp_perpsective(bin_image_crop, src, np.float32(dst))
-
-    return undist, bin_image_warped
-
-def calculate_lines(img):
-    """
-    function calculates the lines using following workflow:
-    1. get lane starts using histogram
-
-    Args:
-        img ([type]): [description]
-    """
-
-    result_img = get_lane_points(img)
-
-    return result_img
-
+import ad_lane
 
 def region_of_interest(img, vertices):
     """
@@ -226,10 +163,10 @@ def get_lane_points(img):
         win_xright_high = rightx_current + margin
 
         # #Only for debugging showing the windows
-        cv2.rectangle(out_img,(win_xleft_low,win_y_low),
-        (win_xleft_high,win_y_high),(0,255,0), 2) 
-        cv2.rectangle(out_img,(win_xright_low,win_y_low),
-        (win_xright_high,win_y_high),(0,255,0), 2) 
+        # cv2.rectangle(out_img,(win_xleft_low,win_y_low),
+        # (win_xleft_high,win_y_high),(0,255,0), 2) 
+        # cv2.rectangle(out_img,(win_xright_low,win_y_low),
+        # (win_xright_high,win_y_high),(0,255,0), 2) 
 
         #get all indices of the pciels that are not zero inside the windows and append the to the land list
         good_left_inds = ((nonzero_y >= win_y_low) & (nonzero_y < win_y_high) & 
@@ -245,36 +182,306 @@ def get_lane_points(img):
         if len(good_right_inds) > minpix:
             rightx_current = int(np.sum(nonzero_x[right_lane_ind[-1]])//len(nonzero_x[right_lane_ind[-1]]))
 
-        #concenate arrays to get all the indices in one alist
-        left_lane_ind = np.concatenate(left_lane_ind)
-        right_lane_ind = np.concatenate(right_lane_ind)
+    #concenate arrays to get all the indices in one alist
+    left_lane_ind = np.concatenate(left_lane_ind)
+    right_lane_ind = np.concatenate(right_lane_ind)
 
-        #extract lefta dn right pixels
-        leftx = nonzero_x[left_lane_ind]
-        lefty = nonzero_y[left_lane_ind]
-        rightx = nonzero_x[left_lane_ind]
-        righty = nonzero_y[left_lane_ind]
+    #extract lefta dn right pixels
+    leftx = nonzero_x[left_lane_ind]
+    lefty = nonzero_y[left_lane_ind]
+    rightx = nonzero_x[right_lane_ind]
+    righty = nonzero_y[right_lane_ind]
 
-    return out_img, leftx, lefty, rightx, righty
+    return leftx, lefty, rightx, righty
 
-def fit_polynom(img):
+def fit_polynom(img, left_points_x, left_points_y, right_points_x, right_points_y):
     """
-    get form the found point of a lane a polyonmial function to display the line
+    get from the found points of a lane a polyonmial function to display the line
+
+    Args:
+        img ([type]): [description]
+    """
+    #fit a secong order polynom on the points
+    left_fit = np.polyfit(left_points_y, left_points_x, 2)
+    right_fit = np.polyfit(right_points_y, right_points_x, 2)
+
+    #create x and y values for plotting
+    plot_points = np.linspace(0, img.shape[0]-1, img.shape[0])
+
+    return left_fit, right_fit, plot_points
+
+def search_with_poly(img, left_fit, right_fit):
+    """
+    seraches for a new polynom using a previous polynom
+
+    Args:
+        img ([type]): [description]
+        left_fit ([type]): [description]
+        right_fit ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
+    #tolreance for the search 
+    margin = 100
+
+    #get all the nonzero pixels
+    nonzero = binary_warped.nonzero()
+    nonzero_y = np.array(nonzero[0])
+    nonzero_x = np.array(nonzero[1])
+
+    #search for all the pixels which can be mapped to the polynom with +/- margin
+    left_fit_line = left_fit[0]*plot_points**2 + left_fit[1]*plot_points + left_fit[2]
+    left_lane_ind = ((nonzero_x >= (left_fit_line - margin)) & (nonzero_x <= (left_fit_line + margin)))
+    right_fit_line = right_fit[0]*plot_points**2 + right_fit[1]*plot_points + right_fit[2]
+    right_lane_ind = ((nonzero_x >= (right_fit_line - margin)) & (nonzero_x <= (right_fit_line + margin)))
+
+    #get all the pixel based on indices
+    leftx = nonzerox[left_lane_ind]
+    lefty = nonzeroy[left_lane_ind] 
+    rightx = nonzerox[right_lane_ind]
+    righty = nonzeroy[right_lane_ind]
+
+    #fit new polynom
+    left_fit, right_fit = fit_polynom(img, leftx, lefty, rightx, righty)
+
+    return left_fit, right_fit, plot_points
+
+def measure_curv(left_fit, right_fit, plot_points, ym_per_pix, xm_per_pix):
+    """
+    calculates the curvature using a given polynom
+
+    Args:
+        left_fit ([type]): [description]
+        right_fit ([type]): [description]
+        plot_points ([type]): [description]
+    """
+
+    #get the max y value (start of the lane) this is the place we want to calc the curvature
+    y_curve = np.max(plot_points)
+
+    #calculate/defin the new polynom values to get m instead of pixel
+
+    cofA_left = xm_per_pix / (ym_per_pix**2) * left_fit[0]
+    cofB_left = (xm_per_pix/ym_per_pix) * left_fit[1]
+
+    cofA_right = xm_per_pix / (ym_per_pix**2) * right_fit[0]
+    cofB_right = (xm_per_pix/ym_per_pix) * right_fit[1]
+
+    #calculate the curvature using the formula: R = (1+(2Ay+B)^2)^3/2)/|2A| with y = A*y^2+B*y+C
+    left_curv_m = ((1+(2*cofA_left*y_curve*ym_per_pix+cofB_left)**2)**(2/2))/np.absolute(2*cofA_left)
+    right_curv_m = ((1+(2*cofA_right*y_curve*ym_per_pix+cofB_right)**2)**(2/2))/np.absolute(2*cofA_right)
+
+    curv_mean = (left_curv_m + right_curv_m) / 2
+
+    return curv_mean
+
+def calc_veh_pos(img, left_fit, right_fit, plot_points, ym_per_pix,xm_per_pix):
+    """
+    calculate the vehicle position (middle point of the camera) between the two detecte lines (use polynom)
+    """
+
+    # calculate the position of the lines in m
+    y_max = np.max(plot_points)
+
+    #claulate coeeficient in m for polynom
+    cofA_left = xm_per_pix / (ym_per_pix**2) * left_fit[0]
+    cofB_left = (xm_per_pix/ym_per_pix) * left_fit[1]
+    cofC_left = xm_per_pix * left_fit[2]
+
+    cofA_right = xm_per_pix / (ym_per_pix**2) * right_fit[0]
+    cofB_right = (xm_per_pix/ym_per_pix) * right_fit[1]
+    cofC_right = xm_per_pix * right_fit[2]
+
+    #calculate postition using the polynom function
+    lane_pos_left = left_fit[0]*(y_max**2) + left_fit[1]*y_max + left_fit[2]
+    lane_pos_right = right_fit[0]*(y_max**2) + right_fit[1]*y_max + right_fit[2]
+
+    lane_pos_left_m = cofA_left*((y_max*ym_per_pix)**2) + cofB_left*(y_max*ym_per_pix) + cofC_left
+    lane_pos_right_m = cofA_right*((y_max*ym_per_pix)**2) + cofB_right*(y_max*ym_per_pix) + cofC_right
+
+    #calulate the middle of the two lines
+    middle_pos = (lane_pos_left_m + lane_pos_right_m) / 2
+
+    #calculate car position assuming the middel of the picture is the car
+    car_pos = (img.shape[1] / 2) * xm_per_pix
+
+    #calc diff between land middle pos and car pos
+    diff_pos = car_pos - middle_pos
+
+    if diff_pos >= 0:
+        direction = "right"
+    else:
+        direction = "left"
+
+    return np.absolute(diff_pos), direction
+
+
+def preprocess_image(img, cam_values):
+    """
+    Function to prepare image for lane extraction:
+    1. undistort image
+    2. crop a region of interest
+    3. convert image to hsv
+    4. Get binary gradient image using sobel
+    5. transfer binary image using the roi
 
     Args:
         img ([type]): [description]
     """
 
+    vertices = np.array([[
+        ((img.shape[1]/2 - 80),img.shape[0]/1.6),
+        ((img.shape[1]/2 + 80),img.shape[0]/1.6),
+        ((img.shape[1] - 150  ),img.shape[0] - 40),
+        (0 + 225,img.shape[0] - 40)]], dtype=np.int32)
 
-for image in images:   
+    offset = vertices[0][0][0] - vertices[0][3][0]
+
+    dst = np.array([[
+        (125, 0),
+        ((img.shape[1] -125),0),
+        ((img.shape[1] - 265),img.shape[0]),
+        (265,img.shape[0])]], dtype=np.int32)
+
+    undist = cv2.undistort(img, cam_values['mtx'], cam_values['dist'], None, cam_values['mtx'])
+
+    bin_image_thresh = abs_sobel_thresh(undist, orient='x', thresh_min = 10, thresh_max = 100)
+    #if disturbance is to high reset to 150-170 (min value)
+    bin_image_hls = svalues_mask(undist, s_min = 120, s_max = 255)
+
+    #combine both bin images
+    bin_image = np.zeros_like(bin_image_thresh)
+    bin_image[(bin_image_thresh == 1) | (bin_image_hls == 1)] = 1
+
+    bin_image_crop = region_of_interest(bin_image, vertices)
+
+    src = np.float32([[vertices[0][0]],[vertices[0][1]], [vertices[0][2]],[vertices[0][3]]])
+
+    bin_image_warped = warp_perpsective(bin_image_crop, src, np.float32(dst))
+
+    Minv = cv2.getPerspectiveTransform(np.float32(dst), src)
+
+    return undist, bin_image_warped, Minv
+
+def calculate_lines(img, lane):
+    """
+    function calculates the lines using following workflow:
+    1. get lane starts using histogram
+
+    Args:
+        img ([type]): [description]
+    """
+
+    #Conversion parameters to calculate form pixels to m
+    ym_per_pix = 30/720
+    xm_per_pix = 3.7/600
+
+    leftx, lefty, rightx, righty = get_lane_points(img)
+    # left_fit, right_fit = fit_polynom(img, leftx, lefty, rightx, righty)
+
+    if lane.detected == True:
+        if len(left_fit) != 0:
+            print ('place search poly here')
+    else:
+        lane.left_fit, lane.right_fit, lane.plot_points = fit_polynom(img, leftx, lefty, rightx, righty)
+
+        #Only for debugging prupos
+        lane.left_fit_line = lane.left_fit[0]*lane.plot_points**2 + lane.left_fit[1]*lane.plot_points + lane.left_fit[2]
+        lane.right_fit_line = lane.right_fit[0]*lane.plot_points**2 + lane.right_fit[1]*lane.plot_points + lane.right_fit[2]
+
+        # plt.plot(left_fit_line, plot_points, color='blue')
+        # plt.plot(right_fit_line, plot_points, color='blue')
+
+        lane.curv_radius = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
+        lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
+
+
+def draw_lane(bin_image_warped, left_fit_line, right_fit_line, plot_points, Minv, img_shape):
+    """
+    This functions creates a overlay image to draw the lines
+
+    Args:
+        dst_img ([type]): [description]
+    """
+
+    # Create an image to draw the lines on
+    warp_zero = np.zeros_like(bin_image_warped).astype(np.uint8)
+    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+
+    # Recast the x and y points into usable format for cv2.fillPoly()
+    pts_left = np.array([np.transpose(np.vstack([left_fit_line, plot_points]))])
+    pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fit_line, plot_points])))])
+    pts = np.hstack((pts_left, pts_right))
+
+    # Draw the lane onto the warped blank image
+    cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+
     
-    image = cv2.imread(image)
-    image, bin_image = preprocess_image(image, cam_values)
+    # Warp the blank back to original image space using inverse perspective matrix (Minv)
+    newwarp = cv2.warpPerspective(color_warp, Minv, (img_shape[1], img_shape[0])) 
 
-    line_image = calculate_lines(bin_image)
+    return newwarp
 
-    # cv2.imshow('image', bin_image)
-    # cv2.waitKey(0)
+def post_process_image(warp_img, lane, Minv, undist_img):
+    """
+    uses the working image and the calculated values to show them in the final image
 
-    plt.imshow(line_image)
-    plt.show()
+    Args:
+        warp_img ([type]): image used to do the calculations
+        lane ([type]): lane class with all neccesary values to draw
+        Minv ([type]): Inverse matrix to recalulate pixel values
+        undist_img ([type]): final image
+    """
+
+    lane_image = draw_lane(warp_img, lane.left_fit_line, lane.right_fit_line, lane.plot_points, Minv, undist_img.shape)
+    result = cv2.addWeighted(image_undist, 1, lane_image, 0.3, 0)
+    cv2.putText(result,'Radius of curvature=' + str(int(lane.curv_radius)) + 'm', (0,30), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,255,255),2)
+    cv2.putText(result,'Vehicle is ' + "%.2f" %lane.vehicle_pos + 'm ' + lane.vehicle_dir + ' of the centre', (0,60), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,255,255),2)
+
+    return result
+    
+
+
+# Important constants and paremeters
+cam_values = pickle.load(open('cam_values.p', "rb"))
+
+images = glob.glob(r".\test_images\*.jpg")
+vid = cv2.VideoCapture('project_video.mp4')
+
+lane = ad_lane.Lane()
+
+while(vid.isOpened()):
+    ret, frame = vid.read()
+
+    if ret == True:
+        image_undist, bin_image_warped, Minv = preprocess_image(frame, cam_values)
+
+        calculate_lines(bin_image_warped, lane)
+
+        result = post_process_image(bin_image_warped, lane, Minv, image_undist)
+
+        cv2.imshow('image', result)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+	        break
+
+    else:
+        break
+
+vid.release()
+cv2.destroyAllWindows
+
+
+
+# #Only for writeup
+# for image in images:   
+    
+#     image = cv2.imread(image)
+#     image_undist, bin_image_warped, Minv = preprocess_image(image, cam_values)
+
+#     calculate_lines(bin_image_warped, lane)
+
+#     result = post_process_image(bin_image_warped, lane, Minv, image_undist)
+
+#     cv2.imshow('image', result)
+#     cv2.waitKey(0)
