@@ -339,8 +339,8 @@ def preprocess_image(img, cam_values):
     offset = vertices[0][0][0] - vertices[0][3][0]
 
     dst = np.array([[
-        (125, 0),
-        ((img.shape[1] -125),0),
+        (95, 0),
+        ((img.shape[1] -95),0),
         ((img.shape[1] - 265),img.shape[0]),
         (265,img.shape[0])]], dtype=np.int32)
 
@@ -381,20 +381,21 @@ def calculate_lines(img, lane):
     # left_fit, right_fit = fit_polynom(img, leftx, lefty, rightx, righty)
 
     if lane.detected == True:
-        if len(left_fit) != 0:
-            print ('place search poly here')
+        lane.left_fit, lane.right_fit, lane.plot_points = search_with_poly(img, lane.left_fit, lane.right_fit, lane.plot_points)
     else:
         lane.left_fit, lane.right_fit, lane.plot_points = fit_polynom(img, leftx, lefty, rightx, righty)
 
-        #Only for debugging prupos
-        lane.left_fit_line = lane.left_fit[0]*lane.plot_points**2 + lane.left_fit[1]*lane.plot_points + lane.left_fit[2]
-        lane.right_fit_line = lane.right_fit[0]*lane.plot_points**2 + lane.right_fit[1]*lane.plot_points + lane.right_fit[2]
+    #Only for debugging prupos
+    lane.left_fit_line = lane.left_fit[0]*lane.plot_points**2 + lane.left_fit[1]*lane.plot_points + lane.left_fit[2]
+    lane.right_fit_line = lane.right_fit[0]*lane.plot_points**2 + lane.right_fit[1]*lane.plot_points + lane.right_fit[2]
 
-        # plt.plot(left_fit_line, plot_points, color='blue')
-        # plt.plot(right_fit_line, plot_points, color='blue')
+    # plt.plot(left_fit_line, plot_points, color='blue')
+    # plt.plot(right_fit_line, plot_points, color='blue')
 
-        lane.curv_radius = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
-        lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
+    lane.curv_radius = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
+    lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
+
+    print(lane.sanity_check())
 
 
 def draw_lane(bin_image_warped, left_fit_line, right_fit_line, plot_points, Minv, img_shape):

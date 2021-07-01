@@ -1,3 +1,5 @@
+import numpy as np
+
 class Lane():
     def __init__(self):
         #determines if the line was detected in the frame before
@@ -34,7 +36,7 @@ class Lane():
 
         mean = np.mean(np.absolute(diff))
     
-        if np.absolute(diff) <= 1:
+        if np.absolute(diff) <= 450:
             print('Horiz', diff)
             return False
         else:
