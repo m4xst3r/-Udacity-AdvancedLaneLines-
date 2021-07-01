@@ -210,7 +210,7 @@ def fit_polynom(img, left_points_x, left_points_y, right_points_x, right_points_
 
     return left_fit, right_fit, plot_points
 
-def search_with_poly(img, left_fit, right_fit):
+def search_with_poly(img, left_fit, right_fit, plot_points):
     """
     seraches for a new polynom using a previous polynom
 
@@ -226,24 +226,24 @@ def search_with_poly(img, left_fit, right_fit):
     margin = 100
 
     #get all the nonzero pixels
-    nonzero = binary_warped.nonzero()
+    nonzero = img.nonzero()
     nonzero_y = np.array(nonzero[0])
     nonzero_x = np.array(nonzero[1])
 
     #search for all the pixels which can be mapped to the polynom with +/- margin
-    left_fit_line = left_fit[0]*plot_points**2 + left_fit[1]*plot_points + left_fit[2]
+    left_fit_line = left_fit[0]*nonzero_y**2 + left_fit[1]*nonzero_y + left_fit[2]
     left_lane_ind = ((nonzero_x >= (left_fit_line - margin)) & (nonzero_x <= (left_fit_line + margin)))
-    right_fit_line = right_fit[0]*plot_points**2 + right_fit[1]*plot_points + right_fit[2]
+    right_fit_line = right_fit[0]*nonzero_y**2 + right_fit[1]*nonzero_y + right_fit[2]
     right_lane_ind = ((nonzero_x >= (right_fit_line - margin)) & (nonzero_x <= (right_fit_line + margin)))
 
     #get all the pixel based on indices
-    leftx = nonzerox[left_lane_ind]
-    lefty = nonzeroy[left_lane_ind] 
-    rightx = nonzerox[right_lane_ind]
-    righty = nonzeroy[right_lane_ind]
+    leftx = nonzero_x[left_lane_ind]
+    lefty = nonzero_y[left_lane_ind] 
+    rightx = nonzero_x[right_lane_ind]
+    righty = nonzero_y[right_lane_ind]
 
     #fit new polynom
-    left_fit, right_fit = fit_polynom(img, leftx, lefty, rightx, righty)
+    left_fit, right_fit, plot_points = fit_polynom(img, leftx, lefty, rightx, righty)
 
     return left_fit, right_fit, plot_points
 
@@ -258,7 +258,7 @@ def measure_curv(left_fit, right_fit, plot_points, ym_per_pix, xm_per_pix):
     """
 
     #get the max y value (start of the lane) this is the place we want to calc the curvature
-    y_curve = np.max(plot_points)
+    y_curve = np.linspace(np.max(plot_points), 200, 200)
 
     #calculate/defin the new polynom values to get m instead of pixel
 
@@ -272,9 +272,12 @@ def measure_curv(left_fit, right_fit, plot_points, ym_per_pix, xm_per_pix):
     left_curv_m = ((1+(2*cofA_left*y_curve*ym_per_pix+cofB_left)**2)**(2/2))/np.absolute(2*cofA_left)
     right_curv_m = ((1+(2*cofA_right*y_curve*ym_per_pix+cofB_right)**2)**(2/2))/np.absolute(2*cofA_right)
 
+    left_curv_m = np.mean(left_curv_m)
+    right_curv_m = np.mean(right_curv_m)
+
     curv_mean = (left_curv_m + right_curv_m) / 2
 
-    return curv_mean
+    return curv_mean, left_curv_m, right_curv_m
 
 def calc_veh_pos(img, left_fit, right_fit, plot_points, ym_per_pix,xm_per_pix):
     """
@@ -334,21 +337,21 @@ def preprocess_image(img, cam_values):
         ((img.shape[1]/2 - 80),img.shape[0]/1.6),
         ((img.shape[1]/2 + 80),img.shape[0]/1.6),
         ((img.shape[1] - 150  ),img.shape[0] - 40),
-        (0 + 225,img.shape[0] - 40)]], dtype=np.int32)
+        (0 + 150,img.shape[0] - 40)]], dtype=np.int32)
 
     offset = vertices[0][0][0] - vertices[0][3][0]
 
     dst = np.array([[
-        (125, 0),
-        ((img.shape[1] -125),0),
-        ((img.shape[1] - 265),img.shape[0]),
-        (265,img.shape[0])]], dtype=np.int32)
+        (220, 0),
+        ((img.shape[1] - 220),0),
+        ((img.shape[1] - 290),img.shape[0]),
+        (290,img.shape[0])]], dtype=np.int32)
 
     undist = cv2.undistort(img, cam_values['mtx'], cam_values['dist'], None, cam_values['mtx'])
 
     bin_image_thresh = abs_sobel_thresh(undist, orient='x', thresh_min = 10, thresh_max = 100)
     #if disturbance is to high reset to 150-170 (min value)
-    bin_image_hls = svalues_mask(undist, s_min = 120, s_max = 255)
+    bin_image_hls = svalues_mask(undist, s_min = 150, s_max = 255)
 
     #combine both bin images
     bin_image = np.zeros_like(bin_image_thresh)
@@ -381,20 +384,33 @@ def calculate_lines(img, lane):
     # left_fit, right_fit = fit_polynom(img, leftx, lefty, rightx, righty)
 
     if lane.detected == True:
-        if len(left_fit) != 0:
-            print ('place search poly here')
+        lane.left_fit, lane.right_fit, lane.plot_points = search_with_poly(img, lane.left_fit, lane.right_fit, lane.plot_points)
     else:
         lane.left_fit, lane.right_fit, lane.plot_points = fit_polynom(img, leftx, lefty, rightx, righty)
 
-        #Only for debugging prupos
-        lane.left_fit_line = lane.left_fit[0]*lane.plot_points**2 + lane.left_fit[1]*lane.plot_points + lane.left_fit[2]
-        lane.right_fit_line = lane.right_fit[0]*lane.plot_points**2 + lane.right_fit[1]*lane.plot_points + lane.right_fit[2]
 
-        # plt.plot(left_fit_line, plot_points, color='blue')
-        # plt.plot(right_fit_line, plot_points, color='blue')
+    lane.left_fit_line = lane.left_fit[0]*lane.plot_points**2 + lane.left_fit[1]*lane.plot_points + lane.left_fit[2]
+    lane.right_fit_line = lane.right_fit[0]*lane.plot_points**2 + lane.right_fit[1]*lane.plot_points + lane.right_fit[2]
 
-        lane.curv_radius = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
-        lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
+
+    # plt.plot(lane.left_fit_line, lane.plot_points, color='blue')
+    # plt.plot(lane.right_fit_line, lane.plot_points, color='blue')
+
+    # plt.imshow(img)
+    # plt.show()
+
+    lane.curv_radius, lane.left_curv, lane.right_curv = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
+    lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
+
+    print (lane.sanity_check())
+    if lane.sanity_check() == False:
+        
+        plt.plot(lane.left_fit_line, lane.plot_points, color='blue')
+        plt.plot(lane.right_fit_line, lane.plot_points, color='blue')
+
+        plt.imshow(img)
+        plt.show()
+
 
 
 def draw_lane(bin_image_warped, left_fit_line, right_fit_line, plot_points, Minv, img_shape):
@@ -473,7 +489,7 @@ cv2.destroyAllWindows
 
 
 
-# #Only for writeup
+#Only for writeup
 # for image in images:   
     
 #     image = cv2.imread(image)
