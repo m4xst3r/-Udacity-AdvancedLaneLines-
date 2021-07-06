@@ -30,6 +30,37 @@ class Lane():
         self.vehicle_pos = None
         self.vehicle_dir = None
 
+        #last fitted line point - only x values as y values never fit
+        self.fitted_points_list = []
+        self.fitted_points_list_left = []
+        self.fitted_points_list_right = []
+        #average of the fitted points
+        self.best_fit_x_left = []
+        self.best_fit_x_right = None
+
+    def smoothing_poly(self, frames= 4):
+        """
+        calculates an average from all poly values with given frame number
+        returns True if smoothin is valid
+
+        Args:
+            frames (int, optional): [description]. Defaults to 4.
+        """
+        if len(self.fitted_points_list) < frames:
+            self.fitted_points_list.append((self.left_fit, self.right_fit))
+            return False
+        else:
+            self.fitted_points_list.append((self.left_fit, self.right_fit))
+            temp_best_fit_x_left = []
+            temp_best_fit_x_right = []
+            for fitted_points in self.fitted_points_list:
+                temp_best_fit_x_left.append(fitted_points[0])
+                temp_best_fit_x_right.append(fitted_points[1])
+            self.best_fit_x_left = np.sum(temp_best_fit_x_left, axis=0)/(frames+1)
+            self.best_fit_x_right = np.sum(temp_best_fit_x_right, axis=0)/(frames+1)
+            self.fitted_points_list.pop(0)
+            return True
+
     def sanity_horizon(self):
         """
         check if the distnace between the lines is similar

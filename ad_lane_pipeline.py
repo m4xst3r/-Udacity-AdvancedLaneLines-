@@ -380,23 +380,26 @@ def calculate_lines(img, lane):
     leftx, lefty, rightx, righty = get_lane_points(img)
     # left_fit, right_fit = fit_polynom(img, leftx, lefty, rightx, righty)
 
-    if lane.detected == True and lane.confident_cnt < 5:
-        lane.left_fit, lane.right_fit, lane.plot_points = search_with_poly(img, lane.left_fit, lane.right_fit)
+    if lane.detected == True and lane.confident_cnt < 4:
+        #apply smoothing to avoid jumping of lanes over the lastn images
+        ret = lane.smoothing_poly(frames=4)
+
+        #calculate lines, curvature and car position
+        if ret == True:
+            lane.left_fit, lane.right_fit, lane.plot_points = search_with_poly(img, lane.best_fit_x_left, lane.best_fit_x_right)
+            lane.curv_radius, lane.curv_radius_left, lane.curv_radius_right = measure_curv(lane.best_fit_x_left, lane.best_fit_x_right, lane.plot_points, ym_per_pix, xm_per_pix)  
+            lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.best_fit_x_left, lane.best_fit_x_right, lane.plot_points, ym_per_pix,xm_per_pix)
+        else:
+            lane.left_fit, lane.right_fit, lane.plot_points = search_with_poly(img, lane.left_fit, lane.right_fit)
+            lane.curv_radius, lane.curv_radius_left, lane.curv_radius_right = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
+            lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
     else:
         lane.left_fit, lane.right_fit, lane.plot_points = fit_polynom(img, leftx, lefty, rightx, righty)
+        lane.curv_radius, lane.curv_radius_left, lane.curv_radius_right = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
+        lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
 
-    #Only for debugging prupos
-    lane.left_fit_line = lane.left_fit[0]*lane.plot_points**2 + lane.left_fit[1]*lane.plot_points + lane.left_fit[2]
-    lane.right_fit_line = lane.right_fit[0]*lane.plot_points**2 + lane.right_fit[1]*lane.plot_points + lane.right_fit[2]
 
-    # plt.plot(left_fit_line, plot_points, color='blue')
-    # plt.plot(right_fit_line, plot_points, color='blue')
-
-    #calculate the curvature of the lane and the position of the car
-    lane.curv_radius, lane.curv_radius_left, lane.curv_radius_right = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
-    lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
-
-    #check if the lanes are sane
+    #check if the lanes are sane and apply smoothing
     if lane.sanity_check() == True:
         lane.detected = True
         lane.confident_cnt = 0
