@@ -331,8 +331,8 @@ def preprocess_image(img, cam_values):
     """
 
     vertices = np.array([[
-        ((img.shape[1]/2 - 80),img.shape[0]/1.6),
-        ((img.shape[1]/2 + 80),img.shape[0]/1.6),
+        ((img.shape[1]/2 - 80),img.shape[0]/1.59),
+        ((img.shape[1]/2 + 80),img.shape[0]/1.59),
         ((img.shape[1] - 150  ),img.shape[0] - 40),
         (0 + 225,img.shape[0] - 40)]], dtype=np.int32)
 
@@ -383,8 +383,6 @@ def calculate_lines(img, lane):
     if lane.detected == True and lane.confident_cnt < 4:
         #apply smoothing to avoid jumping of lanes over the lastn images
         ret = lane.smoothing_poly(frames=4)
-
-        #calculate lines, curvature and car position
         if ret == True:
             lane.left_fit, lane.right_fit, lane.plot_points = search_with_poly(img, lane.best_fit_x_left, lane.best_fit_x_right)
             lane.curv_radius, lane.curv_radius_left, lane.curv_radius_right = measure_curv(lane.best_fit_x_left, lane.best_fit_x_right, lane.plot_points, ym_per_pix, xm_per_pix)  
@@ -398,6 +396,9 @@ def calculate_lines(img, lane):
         lane.curv_radius, lane.curv_radius_left, lane.curv_radius_right = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
         lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
 
+    #Creating lines out of polynoms
+    lane.left_fit_line = lane.left_fit[0]*lane.plot_points**2 + lane.left_fit[1]*lane.plot_points + lane.left_fit[2]
+    lane.right_fit_line = lane.right_fit[0]*lane.plot_points**2 + lane.right_fit[1]*lane.plot_points + lane.right_fit[2]
 
     #check if the lanes are sane and apply smoothing
     if lane.sanity_check() == True:
@@ -458,6 +459,7 @@ cam_values = pickle.load(open('cam_values.p', "rb"))
 
 images = glob.glob(r".\test_images\*.jpg")
 vid = cv2.VideoCapture('project_video.mp4')
+vid_out = cv2.VideoWriter('project_video_bin.mp4',cv2.VideoWriter_fourcc(*'MP4V'), 20.0, (1280,720))
 
 lane = ad_lane.Lane()
 
@@ -472,6 +474,7 @@ while(vid.isOpened()):
         result = post_process_image(bin_image_warped, lane, Minv, image_undist)
 
         cv2.imshow('image', result)
+        vid_out.write(result)
         if cv2.waitKey(1) & 0xFF == ord('q'):
 	        break
 
@@ -479,6 +482,7 @@ while(vid.isOpened()):
         break
 
 vid.release()
+vid_out.release()
 cv2.destroyAllWindows
 
 
@@ -493,5 +497,5 @@ cv2.destroyAllWindows
 
 #     result = post_process_image(bin_image_warped, lane, Minv, image_undist)
 
-#     cv2.imshow('image', result)
+#     cv2.imshow('image', bin_image_warped*255)
 #     cv2.waitKey(0)
