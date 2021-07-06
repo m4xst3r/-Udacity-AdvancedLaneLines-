@@ -4,6 +4,7 @@ class Lane():
     def __init__(self):
         #determines if the line was detected in the frame before
         self.detected = False
+        self.confident_cnt = 0
 
         #lane points from the current frame
         self.leftx = None
@@ -22,6 +23,8 @@ class Lane():
 
         #curvature calulated
         self.curv_radius = None
+        self.curv_radius_left = None
+        self.curv_radius_right = None
 
         #vehicle position regarding centre
         self.vehicle_pos = None
@@ -37,7 +40,6 @@ class Lane():
         mean = np.mean(np.absolute(diff))
     
         if np.absolute(diff) <= 450:
-            print('Horiz', diff)
             return False
         else:
             return True
@@ -51,10 +53,22 @@ class Lane():
         
         #Check if the step is too high wich would mean the lines dirft apart
         if np.max(diff) >= 0.5:
-            print('Para', diff)
             return False
         else:
             return True
+
+    def sanity_curv(self):
+        """
+        check if the curvature fo the lines is similar
+        """
+
+        diff = self.curv_radius_left - self.curv_radius_right
+
+        if np.absolute(diff) > 1000:
+            return False
+        else:
+            return True
+
 
     def sanity_check(self):
         """
@@ -68,4 +82,13 @@ class Lane():
             if ret == False:
                 return False
             else:
-                return True
+                #only validate curvature of both lanes have a sane curvature
+                if (self.curv_radius_left < 5000) and (self.curv_radius_right < 5000):
+                    ret = self.sanity_curv()
+                    if ret == True:
+                        return True
+                    else:
+                        return False
+                else:
+                    return True
+                   

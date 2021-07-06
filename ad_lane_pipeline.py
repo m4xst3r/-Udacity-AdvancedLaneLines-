@@ -226,24 +226,24 @@ def search_with_poly(img, left_fit, right_fit):
     margin = 100
 
     #get all the nonzero pixels
-    nonzero = binary_warped.nonzero()
+    nonzero = img.nonzero()
     nonzero_y = np.array(nonzero[0])
     nonzero_x = np.array(nonzero[1])
 
     #search for all the pixels which can be mapped to the polynom with +/- margin
-    left_fit_line = left_fit[0]*plot_points**2 + left_fit[1]*plot_points + left_fit[2]
+    left_fit_line = left_fit[0]*nonzero_y**2 + left_fit[1]*nonzero_y + left_fit[2]
     left_lane_ind = ((nonzero_x >= (left_fit_line - margin)) & (nonzero_x <= (left_fit_line + margin)))
-    right_fit_line = right_fit[0]*plot_points**2 + right_fit[1]*plot_points + right_fit[2]
+    right_fit_line = right_fit[0]*nonzero_y**2 + right_fit[1]*nonzero_y + right_fit[2]
     right_lane_ind = ((nonzero_x >= (right_fit_line - margin)) & (nonzero_x <= (right_fit_line + margin)))
 
     #get all the pixel based on indices
-    leftx = nonzerox[left_lane_ind]
-    lefty = nonzeroy[left_lane_ind] 
-    rightx = nonzerox[right_lane_ind]
-    righty = nonzeroy[right_lane_ind]
+    leftx = nonzero_x[left_lane_ind]
+    lefty = nonzero_y[left_lane_ind] 
+    rightx = nonzero_x[right_lane_ind]
+    righty = nonzero_y[right_lane_ind]
 
     #fit new polynom
-    left_fit, right_fit = fit_polynom(img, leftx, lefty, rightx, righty)
+    left_fit, right_fit, plot_points = fit_polynom(img, leftx, lefty, rightx, righty)
 
     return left_fit, right_fit, plot_points
 
@@ -274,7 +274,7 @@ def measure_curv(left_fit, right_fit, plot_points, ym_per_pix, xm_per_pix):
 
     curv_mean = (left_curv_m + right_curv_m) / 2
 
-    return curv_mean
+    return curv_mean, left_curv_m, right_curv_m
 
 def calc_veh_pos(img, left_fit, right_fit, plot_points, ym_per_pix,xm_per_pix):
     """
@@ -380,8 +380,8 @@ def calculate_lines(img, lane):
     leftx, lefty, rightx, righty = get_lane_points(img)
     # left_fit, right_fit = fit_polynom(img, leftx, lefty, rightx, righty)
 
-    if lane.detected == True:
-        lane.left_fit, lane.right_fit, lane.plot_points = search_with_poly(img, lane.left_fit, lane.right_fit, lane.plot_points)
+    if lane.detected == True and lane.confident_cnt < 5:
+        lane.left_fit, lane.right_fit, lane.plot_points = search_with_poly(img, lane.left_fit, lane.right_fit)
     else:
         lane.left_fit, lane.right_fit, lane.plot_points = fit_polynom(img, leftx, lefty, rightx, righty)
 
@@ -392,10 +392,16 @@ def calculate_lines(img, lane):
     # plt.plot(left_fit_line, plot_points, color='blue')
     # plt.plot(right_fit_line, plot_points, color='blue')
 
-    lane.curv_radius = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
+    #calculate the curvature of the lane and the position of the car
+    lane.curv_radius, lane.curv_radius_left, lane.curv_radius_right = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
     lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
 
-    print(lane.sanity_check())
+    #check if the lanes are sane
+    if lane.sanity_check() == True:
+        lane.detected = True
+        lane.confident_cnt = 0
+    else:
+        lane.confident_cnt = lane.confident_cnt + 1
 
 
 def draw_lane(bin_image_warped, left_fit_line, right_fit_line, plot_points, Minv, img_shape):
