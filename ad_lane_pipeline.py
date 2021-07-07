@@ -339,19 +339,25 @@ def preprocess_image(img, cam_values):
         (265,img.shape[0])]], dtype=np.int32)
 
     undist = cv2.undistort(img, cam_values['mtx'], cam_values['dist'], None, cam_values['mtx'])
+    # cv2.imwrite('undist.png', undist)
 
     bin_image_thresh = abs_sobel_thresh(undist, orient='x', thresh_min = 10, thresh_max = 100)
+    # cv2.imwrite('bin_image_sobel.png', bin_image_thresh*255)
     bin_image_hls = svalues_mask(undist, s_min = 120, s_max = 255)
+    # cv2.imwrite('bin_image_hls.png', bin_image_hls*255)
 
     #combine both bin images
     bin_image = np.zeros_like(bin_image_thresh)
     bin_image[(bin_image_thresh == 1) | (bin_image_hls == 1)] = 1
+    cv2.imwrite('bin_image.png', bin_image*255)
 
     bin_image_crop = region_of_interest(bin_image, vertices)
+    # cv2.imwrite('bin_image_cropped.png', bin_image_crop*255)
 
     src = np.float32([[vertices[0][0]],[vertices[0][1]], [vertices[0][2]],[vertices[0][3]]])
 
     bin_image_warped = warp_perpsective(bin_image_crop, src, np.float32(dst))
+    # cv2.imwrite('bin_image_warp.png', bin_image_warped*255)
 
     #get inverse matrix to ba able to recalulate the found lines/points of the warped image
     Minv = cv2.getPerspectiveTransform(np.float32(dst), src)
@@ -464,42 +470,42 @@ vid_out = cv2.VideoWriter('project_video_bin.mp4',cv2.VideoWriter_fourcc(*'MP4V'
 #initialize lane class to store values
 lane = ad_lane.Lane()
 
-#loob over the video and use pipeline on each fram
-while(vid.isOpened()):
-    ret, frame = vid.read()
+#loop over the video and use pipeline on each fram
+# while(vid.isOpened()):
+#     ret, frame = vid.read()
 
-    if ret == True:
-        #start image processing pipeling
-        image_undist, bin_image_warped, Minv = preprocess_image(frame, cam_values)
+#     if ret == True:
+#         #start image processing pipeling
+#         image_undist, bin_image_warped, Minv = preprocess_image(frame, cam_values)
 
-        calculate_lines(bin_image_warped, lane)
+#         calculate_lines(bin_image_warped, lane)
 
-        result = post_process_image(bin_image_warped, lane, Minv, image_undist)
+#         result = post_process_image(bin_image_warped, lane, Minv, image_undist)
 
-        cv2.imshow('image', result)
-        vid_out.write(result)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-	        break
+#         cv2.imshow('image', result)
+#         vid_out.write(result)
+#         if cv2.waitKey(1) & 0xFF == ord('q'):
+# 	        break
 
-    else:
-        break
+#     else:
+#         break
 
-#close all files and windows
-vid.release()
-vid_out.release()
-cv2.destroyAllWindows
+# #close all files and windows
+# vid.release()
+# vid_out.release()
+# cv2.destroyAllWindows
 
 
 
-# #Only for writeup
-# for image in images:   
+#Only for writeup
+#for image in images:   
     
-#     image = cv2.imread(image)
-#     image_undist, bin_image_warped, Minv = preprocess_image(image, cam_values)
+image = cv2.imread(images[0])
+image_undist, bin_image_warped, Minv = preprocess_image(image, cam_values)
 
-#     calculate_lines(bin_image_warped, lane)
+calculate_lines(bin_image_warped, lane)
 
-#     result = post_process_image(bin_image_warped, lane, Minv, image_undist)
+result = post_process_image(bin_image_warped, lane, Minv, image_undist)
 
-#     cv2.imshow('image', bin_image_warped*255)
-#     cv2.waitKey(0)
+cv2.imshow('image', bin_image_warped*255)
+cv2.waitKey(0)

@@ -16,11 +16,12 @@ The goals / steps of this project are the following:
 [//]: # (Image References)
 
 [image1]: ./output_images/cam_calib.png "Undistorted"
-[image2]: ./test_images/test1.jpg "Road Transformed"
-[image3]: ./examples/binary_combo_example.jpg "Binary Example"
-[image4]: ./examples/warped_straight_lines.jpg "Warp Example"
-[image5]: ./examples/color_fit_lines.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
+[image2]: ./output_images/undist.png "Road Transformed"
+[image3]: ./output_images/bin_image_sobel.png "Gradient Example"
+[image4]: ./output_images/bin_image_hls.png "HLS Example"
+[image5]: ./output_images/bin_image.png "Combined Bin"
+[image6]: ./output_images/bin_image_cropped.png "Cropped Image"
+[image7]: ./output_images/bin_image_warp.png "Warped Image"
 [video1]: ./project_video.mp4 "Video"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
@@ -45,16 +46,84 @@ The working camera matrix together with all other values is stored in a pickle f
 
 ### Pipeline (single images)
 
-#### 1. Provide an example of a distortion-corrected image.
+The used pipeline is divided into three steps:
 
-To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
+1. Preprocess the image to get a binary image with only neccesary informations
+2. Calculate the lines an all other properties
+3. Postprocess the image drawing all calculated information and parameters into the final image
+
+Each step is divded in small subfunctions for each step this way it easier to debug and see changes in the performance
+
+#### 1. Preprocess the Image
+
+In total the preprocessing includes 5 steps:
+1. undistort image
+2. Get binary gradient image using sobel
+3. Get binary image using colour threshhold (hls)
+4. crop a region of interest (roi)
+5. warp binary image using the roi
+
+### 1. Undistort a image
+First each image needs to be undistorted using the OpenCV function `cv2.undistort()` the values for the camera matrix are stored in a pickle and an input of the `preprocess_image()` function.
+This is an example of an undisorted image:
+
 ![alt text][image2]
 
-#### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
+### 2. Get binary gradient image using sobel
 
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
+To create a binary image only containing the lines first the gradient information is used to obtain all the lines facing vertically. The function `abs_sobel_thresh()` receives the image, orientation and threshholds needed. The outcome is a binary picture similar to this one:
 
 ![alt text][image3]
+
+### 3. Get binary image using colour threshhold (hls)
+
+In this step also binary image is created but this time using the colour space. Espescially the S (saturation) value of an HLS space. The function `svalues_mask()` uses the same input and returns also a binary image:
+
+![alt text][image4]
+
+For both binary outputs the thershholds are defined seperately by using a sliding window and observin when the most information with less noice is present in all the example pictures.
+Both binary pictures are combined to one for furher processing:
+
+![alt text][image5]
+
+### 4. Crop a roi
+The binary image is cropped to only keep the neccesary information. To crop the image early helps to find the right values for the binary image as the information to be considered is less. The result image will only contain the area with the lines infront of the car defines by a vertices:
+
+![alt text][image6]
+
+### 5. Warp binary image using the roi
+
+In the last step the define roi is warped to get a birds eye view of the lanes. This is need for the calculation of the lanes afterwars. To warp the image there is the need to define soruce and destination points. The source points are already defined from the roi:
+
+```python
+vertices = np.array([[
+    ((img.shape[1]/2 - 80),img.shape[0]/1.59),
+    ((img.shape[1]/2 + 80),img.shape[0]/1.59),
+    ((img.shape[1] - 150  ),img.shape[0] - 40),
+    (0 + 225,img.shape[0] - 40)]], dtype=np.int32)
+```
+
+The destination points arr sperately defined and need to match the source to not distort the image:
+```python
+dst = np.array([[
+        (95, 0),
+        ((img.shape[1] -95),0),
+        ((img.shape[1] - 265),img.shape[0]),
+        (265,img.shape[0])]], dtype=np.int32)
+```
+
+This resulted in the following source and destination points:
+
+| Source        | Destination   | 
+|:-------------:|:-------------:| 
+| 560, 490      | 95, 0        | 
+| 720, 490      | 1185, 0      |
+| 1130, 680     | 1015, 720    |
+| 225, 680      | 265, 720     |
+
+To confirm the value are good an image with straight lines is used to observe if the lanes are still straight after the transforming which is the case:
+
+![alt text][image7]
 
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
