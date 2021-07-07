@@ -123,7 +123,6 @@ def get_lane_points(img):
     #sum all pixels in a vertical orientation
     histogram = np.sum(bottom_half, axis=0)
 
-    out_img = np.dstack((img, img, img*255))
     #get the middel point from histogram and search for max 
     #left and right from that middel point
     midpoint = np.int32(histogram.shape[0]//2)
@@ -162,13 +161,7 @@ def get_lane_points(img):
         win_xright_low = rightx_current - margin
         win_xright_high = rightx_current + margin
 
-        # #Only for debugging showing the windows
-        # cv2.rectangle(out_img,(win_xleft_low,win_y_low),
-        # (win_xleft_high,win_y_high),(0,255,0), 2) 
-        # cv2.rectangle(out_img,(win_xright_low,win_y_low),
-        # (win_xright_high,win_y_high),(0,255,0), 2) 
-
-        #get all indices of the pciels that are not zero inside the windows and append the to the land list
+        #get all indices of the pixels that are not zero inside the windows and append the to the lane list
         good_left_inds = ((nonzero_y >= win_y_low) & (nonzero_y < win_y_high) & 
         (nonzero_x >= win_xleft_low) &  (nonzero_x < win_xleft_high)).nonzero()[0]
         good_right_inds = ((nonzero_y >= win_y_low) & (nonzero_y < win_y_high) & 
@@ -177,6 +170,7 @@ def get_lane_points(img):
         left_lane_ind.append(good_left_inds)
         right_lane_ind.append(good_right_inds)
 
+        #get new starting position for the next sliding window
         if len(good_left_inds) > minpix:
             leftx_current = int(np.sum(nonzero_x[left_lane_ind[-1]])//len(nonzero_x[left_lane_ind[-1]]))
         if len(good_right_inds) > minpix:
@@ -261,7 +255,6 @@ def measure_curv(left_fit, right_fit, plot_points, ym_per_pix, xm_per_pix):
     y_curve = np.max(plot_points)
 
     #calculate/defin the new polynom values to get m instead of pixel
-
     cofA_left = xm_per_pix / (ym_per_pix**2) * left_fit[0]
     cofB_left = (xm_per_pix/ym_per_pix) * left_fit[1]
 
@@ -272,6 +265,7 @@ def measure_curv(left_fit, right_fit, plot_points, ym_per_pix, xm_per_pix):
     left_curv_m = ((1+(2*cofA_left*y_curve*ym_per_pix+cofB_left)**2)**(2/2))/np.absolute(2*cofA_left)
     right_curv_m = ((1+(2*cofA_right*y_curve*ym_per_pix+cofB_right)**2)**(2/2))/np.absolute(2*cofA_right)
 
+    #calculate the mean curvature (curvatur from the middle of the lane)
     curv_mean = (left_curv_m + right_curv_m) / 2
 
     return curv_mean, left_curv_m, right_curv_m
@@ -330,14 +324,14 @@ def preprocess_image(img, cam_values):
         img ([type]): [description]
     """
 
+    #define a vertices which includes the lane 
     vertices = np.array([[
         ((img.shape[1]/2 - 80),img.shape[0]/1.59),
         ((img.shape[1]/2 + 80),img.shape[0]/1.59),
         ((img.shape[1] - 150  ),img.shape[0] - 40),
         (0 + 225,img.shape[0] - 40)]], dtype=np.int32)
 
-    offset = vertices[0][0][0] - vertices[0][3][0]
-
+    #define a destination vertice to warp the image 
     dst = np.array([[
         (95, 0),
         ((img.shape[1] -95),0),
@@ -347,7 +341,6 @@ def preprocess_image(img, cam_values):
     undist = cv2.undistort(img, cam_values['mtx'], cam_values['dist'], None, cam_values['mtx'])
 
     bin_image_thresh = abs_sobel_thresh(undist, orient='x', thresh_min = 10, thresh_max = 100)
-    #if disturbance is to high reset to 150-170 (min value)
     bin_image_hls = svalues_mask(undist, s_min = 120, s_max = 255)
 
     #combine both bin images
@@ -360,6 +353,7 @@ def preprocess_image(img, cam_values):
 
     bin_image_warped = warp_perpsective(bin_image_crop, src, np.float32(dst))
 
+    #get inverse matrix to ba able to recalulate the found lines/points of the warped image
     Minv = cv2.getPerspectiveTransform(np.float32(dst), src)
 
     return undist, bin_image_warped, Minv
@@ -378,12 +372,13 @@ def calculate_lines(img, lane):
     xm_per_pix = 3.7/600
 
     leftx, lefty, rightx, righty = get_lane_points(img)
-    # left_fit, right_fit = fit_polynom(img, leftx, lefty, rightx, righty)
 
+    #depending on the confidence choose the right algorithm to calc polynom
     if lane.detected == True and lane.confident_cnt < 4:
         #apply smoothing to avoid jumping of lanes over the lastn images
         ret = lane.smoothing_poly(frames=4)
         if ret == True:
+            #use smoothing if enough good frame are found
             lane.left_fit, lane.right_fit, lane.plot_points = search_with_poly(img, lane.best_fit_x_left, lane.best_fit_x_right)
             lane.curv_radius, lane.curv_radius_left, lane.curv_radius_right = measure_curv(lane.best_fit_x_left, lane.best_fit_x_right, lane.plot_points, ym_per_pix, xm_per_pix)  
             lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.best_fit_x_left, lane.best_fit_x_right, lane.plot_points, ym_per_pix,xm_per_pix)
@@ -400,7 +395,7 @@ def calculate_lines(img, lane):
     lane.left_fit_line = lane.left_fit[0]*lane.plot_points**2 + lane.left_fit[1]*lane.plot_points + lane.left_fit[2]
     lane.right_fit_line = lane.right_fit[0]*lane.plot_points**2 + lane.right_fit[1]*lane.plot_points + lane.right_fit[2]
 
-    #check if the lanes are sane and apply smoothing
+    #check if the lanes are sane and count confidence frames
     if lane.sanity_check() == True:
         lane.detected = True
         lane.confident_cnt = 0
@@ -428,7 +423,6 @@ def draw_lane(bin_image_warped, left_fit_line, right_fit_line, plot_points, Minv
     # Draw the lane onto the warped blank image
     cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
 
-    
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
     newwarp = cv2.warpPerspective(color_warp, Minv, (img_shape[1], img_shape[0])) 
 
@@ -445,8 +439,13 @@ def post_process_image(warp_img, lane, Minv, undist_img):
         undist_img ([type]): final image
     """
 
+    
     lane_image = draw_lane(warp_img, lane.left_fit_line, lane.right_fit_line, lane.plot_points, Minv, undist_img.shape)
+
+    #overlay resulted imaga and original image
     result = cv2.addWeighted(image_undist, 1, lane_image, 0.3, 0)
+
+    #write text and calculated values to final image
     cv2.putText(result,'Radius of curvature=' + str(int(lane.curv_radius)) + 'm', (0,30), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,255,255),2)
     cv2.putText(result,'Vehicle is ' + "%.2f" %lane.vehicle_pos + 'm ' + lane.vehicle_dir + ' of the centre', (0,60), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,255,255),2)
 
@@ -454,19 +453,23 @@ def post_process_image(warp_img, lane, Minv, undist_img):
     
 
 
-# Important constants and paremeters
+# Import neccesary files/date
 cam_values = pickle.load(open('cam_values.p', "rb"))
-
 images = glob.glob(r".\test_images\*.jpg")
 vid = cv2.VideoCapture('project_video.mp4')
+
+#create output video 
 vid_out = cv2.VideoWriter('project_video_bin.mp4',cv2.VideoWriter_fourcc(*'MP4V'), 20.0, (1280,720))
 
+#initialize lane class to store values
 lane = ad_lane.Lane()
 
+#loob over the video and use pipeline on each fram
 while(vid.isOpened()):
     ret, frame = vid.read()
 
     if ret == True:
+        #start image processing pipeling
         image_undist, bin_image_warped, Minv = preprocess_image(frame, cam_values)
 
         calculate_lines(bin_image_warped, lane)
@@ -481,6 +484,7 @@ while(vid.isOpened()):
     else:
         break
 
+#close all files and windows
 vid.release()
 vid_out.release()
 cv2.destroyAllWindows
