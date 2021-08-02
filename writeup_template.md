@@ -125,7 +125,7 @@ To confirm the value are good an image with straight lines is used to observe if
 
 ![alt text][image7]
 
-#### 2. Calculate lanes and other properties#
+#### 2. Calculate lanes and other properties
 
 After the binary image is correctly extracted the lance calculation is done. In this step it neccesary to distingiush in which state the detection is to be able to use different algorithms and apply smoothing if possible.
 Three states are defined based on the confidence of the detction:
@@ -155,32 +155,20 @@ cofB_left = (xm_per_pix/ym_per_pix) * left_fit[1]
 left_curv_m = ((1+(2*cofA_left*y_curve*ym_per_pix+cofB_left)**2)**(2/2))/np.absolute(2*cofA_left)
 ```
 After the curvature of both lanes is calulated the mean value between them is calculated to determine the curvature in the middle of the picture.
-The position calculation uses a similar method but instead of calculating the curvature of the lane the position of the lanes at the bottom of the picture is calulates using the polynom `y=A*y^2+B*y+C` and of couse recalculated in meters with the same method mentioned in the curvature funtcion. The vehicle position is just determined by the middle of the picture the difference between the car position and the middle point of the two lanes determines the orientation, if the value is greater 0 its right otherwise the car is left of the road and the differnece determines how far away the car is from the middle lane.
 
-The coefficients are neccesary for all calculations: lines, curvature and position.
+The position calculation uses a similar method but instead of calculating the curvature of the lane the position of the lanes at the bottom of the picture is calulates using the polynom `y=A*y^2+B*y+C` and of couse recalculated in meters with the same method mentioned in the curvature funtcion. The vehicle position is just determined by the middle of the picture the difference between the car position and the middle point of the two lanes determines the orientation, if the value is greater 0 its right otherwise the car is left of the road and the differnece determines how far away the car is from the middle lane. In the end the lines are drawn in the source image and both the car position and curvature are displayed in the top left of the picture.
+
+#TODO example picture (test images)
+
+
 If the first coefficients are found it is possible to reduce the effort and search only around the lane found in the previous picture. This is done in the function `search_with_poly()` by using the coefficients to get lanes for left and right and extract all non zero pixels within an area around the lines. With the pixels the new polynom coefficents are than calculated. The only thing which needs to be considered first before the function `search_with_poly()` can be used is to make sure the lanes in the previous frame are fine by a sanity check. The sanity check is comparing line width, parallelism and curvature is okay if this is the case than the sanity check is true and after three good sanity checks the polynom search can be used instead of using the histogram together with the sliding window. As long as the sanity check is fine the pipeline will always use the polynom search but if the sanity check is wrong it will get back to the sliding window method.
-The sanity check itself uses the calculated lines and a given tolerance. The tolerance is determined by testing the performance on the video. The goal is to use tolerances which are not to accurate but also not to slight this is a very chellengin task.
-To have an even smoother lane detet
-
-#### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
-
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
-
-![alt text][image5]
-
-#### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
-
-I did this in lines # through # in my code in `my_other_file.py`
-
-#### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
-
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
-
-![alt text][image6]
-
----
+The sanity check itself uses the calculated lines and a given tolerance. The tolerance is determined by testing the performance on the video. The goal is to use tolerances which are not to accurate but also not to slight this is a very chellenging task.
+To have an even smoother lane detetection after four consecutive frames which passed the sanity check additionally an average polynom is calculated of the last found polynoms. This smoothing will be continued till the sanity check fails which clears also the history to prevent using wrong polynoms in the calulation.
 
 ### Pipeline (video)
+
+Combining all the calulation mentioned in the chapter befor provides the output visualized in the following video:
+
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
@@ -192,4 +180,8 @@ Here's a [link to my video result](./project_video.mp4)
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+During the development one of the most cirtical tasks was to find the right parameters. Slight changes has a huge impact and still in difficult situations like shadows etc. the algorithms are not able to handle it proper. To solve this more and different filtering is necessary to get rid of noise. 
+Additionaly the used algorithm are not that precise as the constants for instance to calculate from pixe to meter are fixed and not measured. It would be better to calculate these values with other sensors or measrue them preciseley.
+The smoothing helped a lot to make the algorithm more stable but it should be adjusted to the speed of the car to realy detrmine how many frame should be used for smoothing.
+For me one of the biggest problems was to eloberate the sanity checks as there is already a high tolerance in the detection the sanity checks need even higher tolerances. The sanity check should be programmed with the help of some measurements and should be used as a ground truth.
+In the end to improve the algorithm more data/measurements are needed which can be used to improve and add algorithms.
