@@ -470,41 +470,41 @@ vid_out = cv2.VideoWriter('project_video_bin.mp4',cv2.VideoWriter_fourcc(*'MP4V'
 lane = ad_lane.Lane()
 
 #loop over the video and use pipeline on each fram
-# while(vid.isOpened()):
-#     ret, frame = vid.read()
+while(vid.isOpened()):
+    ret, frame = vid.read()
 
-#     if ret == True:
-#         #start image processing pipeling
-#         image_undist, bin_image_warped, Minv = preprocess_image(frame, cam_values)
+    if ret == True:
+        #start image processing pipeling
+        image_undist, bin_image_warped, Minv = preprocess_image(frame, cam_values)
 
-#         calculate_lines(bin_image_warped, lane)
+        calculate_lines(bin_image_warped, lane)
 
-#         result = post_process_image(bin_image_warped, lane, Minv, image_undist)
+        result = post_process_image(bin_image_warped, lane, Minv, image_undist)
 
-#         cv2.imshow('image', result)
-#         vid_out.write(result)
-#         if cv2.waitKey(1) & 0xFF == ord('q'):
-# 	        break
+        cv2.imshow('image', result)
+        vid_out.write(result)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+	        break
 
-#     else:
-#         break
+    else:
+        break
 
-# #close all files and windows
-# vid.release()
-# vid_out.release()
-# cv2.destroyAllWindows
+#close all files and windows
+vid.release()
+vid_out.release()
+cv2.destroyAllWindows
 
 
 
-#Only for writeup
-#for image in images:   
+# #Only for writeup
+# #for image in images:   
     
-image = cv2.imread(images[0])
-image_undist, bin_image_warped, Minv = preprocess_image(image, cam_values)
+# image = cv2.imread(images[0])
+# image_undist, bin_image_warped, Minv = preprocess_image(image, cam_values)
 
-calculate_lines(bin_image_warped, lane)
+# calculate_lines(bin_image_warped, lane)
 
-result = post_process_image(bin_image_warped, lane, Minv, image_undist)
+# result = post_process_image(bin_image_warped, lane, Minv, image_undist)
 
-#cv2.imshow('image', result)
-cv2.waitKey(0)
+# #cv2.imshow('image', result)
+# cv2.waitKey(0)

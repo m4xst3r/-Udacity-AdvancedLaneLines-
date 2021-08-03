@@ -54,7 +54,7 @@ The used pipeline is divided into three steps:
 2. Calculate the lines an all other properties
 3. Postprocess the image drawing all calculated information and parameters into the final image
 
-Each step is divded in small subfunctions for each step this way it easier to debug and see changes in the performance
+Each step is divded in small subfunctions for each step this way it easier to debug and see changes in the performance. All the steps are done in one program called "./ad_lane_pipeline.py".
 
 #### 1. Preprocess the Image
 
@@ -158,7 +158,7 @@ left_curv_m = ((1+(2*cofA_left*y_curve*ym_per_pix+cofB_left)**2)**(2/2))/np.abso
 ```
 After the curvature of both lanes is calulated the mean value between them is calculated to determine the curvature in the middle of the picture.
 
-The position calculation uses a similar method but instead of calculating the curvature of the lane the position of the lanes at the bottom of the picture is calulates using the polynom `y=A*y^2+B*y+C` and of couse recalculated in meters with the same method mentioned in the curvature funtcion. The vehicle position is just determined by the middle of the picture the difference between the car position and the middle point of the two lanes determines the orientation, if the value is greater 0 its right otherwise the car is left of the road and the differnece determines how far away the car is from the middle lane. In the end the lines are drawn in the source image and both the car position and curvature are displayed in the top left of the picture.
+The position calculation uses a similar method but instead of calculating the curvature of the lane the position of the lanes at the bottom of the picture is calulates using the polynom `y=A*y^2+B*y+C` and of couse recalculated in meters with the same method mentioned in the curvature funtcion. The vehicle position is just determined by the middle of the picture the difference between the car position and the middle point of the two lanes determines the orientation, if the value is greater 0 its right otherwise the car is left of the road and the differnece determines how far away the car is from the middle lane. In the end the lines are drawn in the source image and both the car position and curvature are displayed in the top left of the picture. 
 
 ![alt text][image9]
 
@@ -166,16 +166,14 @@ The position calculation uses a similar method but instead of calculating the cu
 If the first coefficients are found it is possible to reduce the effort and search only around the lane found in the previous picture. This is done in the function `search_with_poly()` by using the coefficients to get lanes for left and right and extract all non zero pixels within an area around the lines. With the pixels the new polynom coefficents are than calculated. The only thing which needs to be considered first before the function `search_with_poly()` can be used is to make sure the lanes in the previous frame are fine by a sanity check. The sanity check is comparing line width, parallelism and curvature is okay if this is the case than the sanity check is true and after three good sanity checks the polynom search can be used instead of using the histogram together with the sliding window. As long as the sanity check is fine the pipeline will always use the polynom search but if the sanity check is wrong it will get back to the sliding window method.
 The sanity check itself uses the calculated lines and a given tolerance. The tolerance is determined by testing the performance on the video. The goal is to use tolerances which are not to accurate but also not to slight this is a very chellenging task.
 
-To have an even smoother lane detetection after four consecutive frames which passed the sanity check additionally an average polynom is calculated of the last found polynoms. This smoothing will be continued till the sanity check fails which clears also the history to prevent using wrong polynoms in the calulation.
+To have an even smoother lane detetection after four consecutive frames which passed the sanity check additionally an average polynom is calculated of the last found polynoms. This smoothing will be continued till the sanity check fails which clears also the history to prevent using wrong polynoms in the calulation. 
 
 ### Pipeline (video)
 
 Combining all the calulation mentioned in the chapter befor provides the output visualized in the following video:
 
-
-#### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
-
 Here's a [link to my video result](./project_video_detected.mp4)
+
 ![alt text][video1]
 
 ---
