@@ -56,18 +56,18 @@ The used pipeline is divided into three steps:
 
 Each step is divded in small subfunctions for each step this way it easier to debug and see changes in the performance. All the steps are done in one program called "./ad_lane_pipeline.py".
 
-#### 1. Preprocess the Image
+#### 1. Pre-process the Image
 
-In total the preprocessing includes 5 steps:
+In total the pre-processing includes 5 steps:
 1. undistort image
 2. Get binary gradient image using sobel
-3. Get binary image using colour threshhold (hls)
+3. Get binary image using colour threshold (hls)
 4. crop a region of interest (roi)
 5. warp binary image using the roi
 
 ##### 1. Undistort a image
 First each image needs to be undistorted using the OpenCV function `cv2.undistort()` the values for the camera matrix are stored in a pickle and an input of the `preprocess_image()` function.
-This is an example of an undisorted image:
+This is an example of an undistorted image:
 
 ![alt text][image2]
 
@@ -77,14 +77,14 @@ To create a binary image only containing the lines first the gradient informatio
 
 ![alt text][image3]
 
-##### 3. Get binary image using colour threshhold (hls)
+##### 3. Get binary image using colour threshold (hls)
 
 In this step also binary image is created but this time using the colour space. Espescially the S (saturation) value of an HLS space. The function `svalues_mask()` uses the same input and returns also a binary image:
 
 ![alt text][image4]
 
 For both binary outputs the thershholds are defined seperately by using a sliding window and observin when the most information with less noice is present in all the example pictures.
-Both binary pictures are combined to one for furher processing:
+Both binary pictures are combined to one for further processing:
 
 ![alt text][image5]
 
@@ -173,9 +173,6 @@ To have an even smoother lane detetection after four consecutive frames which pa
 Combining all the calulation mentioned in the chapter befor provides the output visualized in the following video:
 
 Here's a [link to my video result](./project_video_detected.mp4)
-
-![alt text][video1]
-
 ---
 
 ### Discussion
@@ -183,7 +180,10 @@ Here's a [link to my video result](./project_video_detected.mp4)
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
 During the development one of the most cirtical tasks was to find the right parameters. Slight changes has a huge impact and still in difficult situations like shadows etc. the algorithms are not able to handle it proper. To solve this more and different filtering is necessary to get rid of noise. 
+
 Additionaly the used algorithm are not that precise as the constants for instance to calculate from pixe to meter are fixed and not measured. It would be better to calculate these values with other sensors or measrue them preciseley.
+
 The smoothing helped a lot to make the algorithm more stable but it should be adjusted to the speed of the car to realy detrmine how many frame should be used for smoothing.
 For me one of the biggest problems was to eloberate the sanity checks as there is already a high tolerance in the detection the sanity checks need even higher tolerances. The sanity check should be programmed with the help of some measurements and should be used as a ground truth.
+
 In the end to improve the algorithm more data/measurements are needed which can be used to improve and add algorithms.
