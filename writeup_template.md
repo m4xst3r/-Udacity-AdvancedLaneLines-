@@ -22,7 +22,9 @@ The goals / steps of this project are the following:
 [image5]: ./output_images/bin_image.png "Combined Bin"
 [image6]: ./output_images/bin_image_cropped.png "Cropped Image"
 [image7]: ./output_images/bin_image_warp.png "Warped Image"
-[video1]: ./project_video.mp4 "Video"
+[image8]: ./output_images/lane_fit.png "Lane Fit"
+[image9]: ./output_images/result.png "Result"
+[video1]: ./project_video_detected.mp4 "Video"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
 
@@ -139,7 +141,7 @@ The pipeline starts in the initial state to process the first frame in this stat
 3. In the last point the pixels are used to get the polynomial coeficients whith which it is possible to generate a function describing the lane
 In the following example image shows the bin image with the points which are used to get the polynomial coefficients marked as well the resultin lane plotted.
 
-#TODO Add picture of Lane finding
+![alt text][image8]
 
 For a better handling all lane properties are stored in a class to access them with different functions and be able to store the vlaues. The class is defined in a seprate python programm called `ad_lane.py`. 
 After the polynomial coefficients are found it is possible to also measure the curvature and the position of the car relative to the lane middle. This is done in two seperate functions for the curve `measure_curv()` and for the position `calc_veh_pos()`. 
@@ -158,11 +160,12 @@ After the curvature of both lanes is calulated the mean value between them is ca
 
 The position calculation uses a similar method but instead of calculating the curvature of the lane the position of the lanes at the bottom of the picture is calulates using the polynom `y=A*y^2+B*y+C` and of couse recalculated in meters with the same method mentioned in the curvature funtcion. The vehicle position is just determined by the middle of the picture the difference between the car position and the middle point of the two lanes determines the orientation, if the value is greater 0 its right otherwise the car is left of the road and the differnece determines how far away the car is from the middle lane. In the end the lines are drawn in the source image and both the car position and curvature are displayed in the top left of the picture.
 
-#TODO example picture (test images)
+![alt text][image9]
 
 
 If the first coefficients are found it is possible to reduce the effort and search only around the lane found in the previous picture. This is done in the function `search_with_poly()` by using the coefficients to get lanes for left and right and extract all non zero pixels within an area around the lines. With the pixels the new polynom coefficents are than calculated. The only thing which needs to be considered first before the function `search_with_poly()` can be used is to make sure the lanes in the previous frame are fine by a sanity check. The sanity check is comparing line width, parallelism and curvature is okay if this is the case than the sanity check is true and after three good sanity checks the polynom search can be used instead of using the histogram together with the sliding window. As long as the sanity check is fine the pipeline will always use the polynom search but if the sanity check is wrong it will get back to the sliding window method.
 The sanity check itself uses the calculated lines and a given tolerance. The tolerance is determined by testing the performance on the video. The goal is to use tolerances which are not to accurate but also not to slight this is a very chellenging task.
+
 To have an even smoother lane detetection after four consecutive frames which passed the sanity check additionally an average polynom is calculated of the last found polynoms. This smoothing will be continued till the sanity check fails which clears also the history to prevent using wrong polynoms in the calulation.
 
 ### Pipeline (video)
@@ -172,7 +175,8 @@ Combining all the calulation mentioned in the chapter befor provides the output 
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./project_video_detected.mp4)
+![alt text][video1]
 
 ---
 

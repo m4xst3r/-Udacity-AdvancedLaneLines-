@@ -392,7 +392,7 @@ def calculate_lines(img, lane):
             lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
     else:
         leftx, lefty, rightx, righty = get_lane_points(img)
-        lane.left_fit, lane.right_fit, lane.plot_points = fit_polynom(img, leftx, lefty, rightx, righty)
+        lane.left_fit, lane.right_fit, lane.plot_points = fit_polynom(img, leftx, lefty, rightx, righty))
         lane.curv_radius, lane.curv_radius_left, lane.curv_radius_right = measure_curv(lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix, xm_per_pix)  
         lane.vehicle_pos, lane.vehicle_dir = calc_veh_pos(img, lane.left_fit, lane.right_fit, lane.plot_points, ym_per_pix,xm_per_pix)
 
@@ -506,5 +506,5 @@ calculate_lines(bin_image_warped, lane)
 
 result = post_process_image(bin_image_warped, lane, Minv, image_undist)
 
-cv2.imshow('image', bin_image_warped*255)
+#cv2.imshow('image', result)
 cv2.waitKey(0)
